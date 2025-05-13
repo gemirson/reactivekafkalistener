@@ -1,0 +1,134 @@
+classDiagram
+    %% Main Consumer Class
+    class ReactiveKafkaListener {
+        -receivedEvents: Sinks.Many~Message~String~~
+        -retryHandler: RetryHandler
+        -idempotencyCheckService: IdempotencyService
+        -config: ConsumerConfig
+        +receive() Consumer~Flux~Message~String~~, Void~
+        -handleMessage(Message~String~) Mono~Void~
+        -handleFailure(Message~String~, Throwable) Mono~Void~
+        -SQSPublisher: MessagePublisher
+        -markAsProcessed(Message~String~) Mono~Void~
+    }
+
+    %% Interfaces
+    class MessageHandler {
+        <<interface>>
+       +handleMessage(Message~String~) Mono~Void~
+    }    
+
+    class RetryHandler {
+        <<interface>>
+        +applyRetryLogic(Mono~T~, String) Mono~T~
+    }
+
+    class IdempotencyCheckService {
+        <<interface>>
+        +iisDuplicate(Message~String~) Mono~Boolean~
+        +markAsProcessed(Message~String~) Mono~Void~
+    }
+
+     class MessagePublisher {
+        <<interface>>
+        +publish(String message) Mono~Void~
+    }
+
+    
+
+    %% Implementations
+    class DefaultMessageHandler {
+        <<interface>>
+       +handleMessage(Message~String~) Mono~Void~
+       -SQSPublisher: MessagePublisher
+    }
+
+    class DefaultRetryHandler {
+        -config: ConsumerConfig
+        +applyRetryLogic(Mono~T~, String) Mono~T~
+    }
+
+    class RedisIdempotencyService {
+        -redisTemplate: ReactiveRedisTemplate~String, String~
+        -config: ConsumerConfig
+        +isDuplicatesAlreadyProcessed(Message~String~) Mono~Boolean~
+        +markAsProcessed(Message~String~) Mono~Void~
+    }
+    class SQSPublisher {
+        +publish(String message) Mono~Void~
+        -sqsAsyncClient: SqsAsyncClient
+        -config: ConsumerConfig
+    }
+
+    %% Configuration
+    class ConsumerConfig {
+        -backpressure: BackpressureConfig
+        -retry: RetryConfig
+        -idempotency: IdempotencyConfig
+        -sqs: SqsConfig
+        +getBackpressureLimit() int
+        +getMaxRetries() int
+        +getRetryBackoff() Duration
+        +isIdempotencyEnabled() boolean
+        +getIdempotencyTtl() Duration
+        +getSqs() String
+    }
+
+    class BackpressureConfig {
+        -limit: int = 100
+    }
+
+    class RetryConfig {
+        -maxAttempts: int = 3
+        -backoff: Duration = 1s
+    }
+
+    class IdempotencyCheckConfig {
+        -enabled: boolean = true
+        -ttl: Duration = 24h
+    }
+
+    class SqsConfig {
+        -url-queue-producer: String
+        -url-queue-consumer: String
+        -url-queue-retry: String
+    }
+
+    %% Relationships
+    ReactiveKafkaListener --> RetryHandler
+    ReactiveKafkaListener --> IdempotencyCheckService
+    ReactiveKafkaListener --> MessagePublisher
+    ReactiveKafkaListener --> ConsumerConfig
+    ReactiveKafkaListener --> MessageHandler
+
+    RetryHandler <|.. DefaultRetryHandler
+    IdempotencyCheckService <|.. RedisIdempotencyService
+    MessagePublisher <|.. SQSPublisher
+    MessageHandler <|.. DefaultMessageHandler
+
+    ConsumerConfig *-- BackpressureConfig
+    ConsumerConfig *-- RetryConfig
+    ConsumerConfig *-- IdempotencyCheckConfig
+    ConsumerConfig *-- SqsConfig
+
+    DefaultRetryHandler --> ConsumerConfig
+    RedisIdempotencyService --> ConsumerConfig
+    RedisIdempotencyService --> ReactiveRedisTemplate~String, String~
+
+    SQSPublisher --> ConsumerConfig
+    SQSPublisher --> SqsAsyncClient
+
+    %% External Dependencies
+    class SqsAsyncClient {
+        <<AWS SDK>>
+        +sendMessage(SendMessageRequest) CompletableFuture~SendMessageResponse~
+    }
+
+    class ReactiveRedisTemplate~K,V~ {
+        <<Spring Data>>
+        +opsForValue() ReactiveValueOperations~K,V~
+    }
+
+    
+    
+    

@@ -1,0 +1,39 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffdfd3', 'edgeLabelBackground':'#fff'}}}%%
+flowchart TD
+    subgraph Kafka
+        A[(Topic\nmyDestination)] -->|Consume| B[ReactiveKafkaListener]
+    end
+
+    subgraph Spring Cloud Stream
+        B --> C{Backpressure\nControl}
+        C -->|Sinks.Many| D[Received Events Buffer]
+        D --> E[Idempotency Check]
+    end
+
+    subgraph Redis
+        E -->|"isDuplicate()"| F[(RedisDynamoDb\nStorage)]
+        F -->|"markAsProcessed()"| E
+    end
+
+    subgraph Processing
+        E -->|New Message| G[Retry Handler]
+        G -->|Retry 3x| H[Business Logic]
+        H -->|Success| I[Mark Processed]
+        G -->|Failure| J[SQS RETRY]
+    end
+
+    subgraph AWS
+        J --> K[(SQS Retry Queue)]
+    end
+
+    subgraph Config
+        L[ConsumerConfig] -.-> B
+        L -.-> G
+        L -.-> E
+        L -.-> J
+    end
+
+    style A fill:#f9d5bb,stroke:#666
+    style F fill:#d4c4fb,stroke:#666
+    style K fill:#fbc4c4,stroke:#666
+    style L fill:#e3f8d3,stroke:#666

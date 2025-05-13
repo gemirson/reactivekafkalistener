@@ -1,0 +1,11 @@
+stateDiagram-v2
+    [*] --> ReactiveKafkaListener: Inicia
+    ReactiveKafkaListener --> IdempotencyCheck: Recebe mensagem
+    IdempotencyCheck --> MessageHandler: Mensagem nova
+    IdempotencyCheck --> Discard: Mensagem duplicada
+    MessageHandler --> RetryHandler: Processa
+    RetryHandler --> Success: Sucesso
+    RetryHandler --> RetrySqs: Falha após retentativas
+    Success --> [*]
+    Discard --> [*]
+    RetrySqs --> [*]

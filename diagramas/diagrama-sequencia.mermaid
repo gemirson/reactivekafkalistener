@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant Kafka as Kafka Topic
+    participant Consumer as ReactiveKafkaConsumer
+    participant Idempotency as RedisIdempotencyService
+    participant Retry as DefaultRetryHandler
+    participant MessageHandler as Business Logic
+    participant SQS as AWS SQS Retry Queue
+
+    Kafka->>Consumer: Message Event (Flux)
+    Consumer->>Idempotency: checkIdempotency(message)
+    alt Is Duplicate
+        Idempotency-->>Consumer: true
+        Consumer->>Consumer: Log duplicate
+    else Is New
+        Idempotency-->>Consumer: false
+        Consumer->>Retry: applyRetryLogic(processMessage)
+        Retry->>MessageHandler: Execute (with retries)
+        alt Success
+            MessageHandler-->>Retry: Success
+            Retry-->>Consumer: Completion
+            Consumer->>Idempotency: markAsProcessed(message)
+        else Failure
+            Retry-->>Consumer: Error
+            Consumer->>SQS: publish(message, error)
+        end
+    end

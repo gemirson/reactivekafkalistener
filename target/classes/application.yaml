@@ -1,0 +1,42 @@
+spring:
+  cloud:
+    function:
+      definition: receive
+    stream:
+      bindings:
+        receive-in-0:
+          destination: myTopic
+          group: myGroup
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9092}
+          configuration:
+            fetch.min.bytes: 1024
+            max.poll.records: 200
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}  # Ou use variáveis de ambiente
+        secret-key: ${AWS_SECRET_ACCESS_KEY}
+      region:
+        static: us-east-1  # Defina sua região AWS
+      sqs:
+        enabled: true
+
+
+
+
+consumer:
+  backpressure:
+    limit: 100
+  retry:
+    max-attempts: 3
+    backoff: 1s
+  idempotency:
+    enabled: true
+    ttl: 24h
+
+  sqs:
+    event-queue-mappings:
+      ORDER_CREATED: https://sqs.us-east-1.amazonaws.com/123456789012/order-created-queue
+      PAYMENT_PROCESSED: https://sqs.us-east-1.amazonaws.com/123456789012/payment-processed-queue
+      INVENTORY_UPDATED: https://sqs.us-east-1.amazonaws.com/123456789012/inventory-updated-queue
